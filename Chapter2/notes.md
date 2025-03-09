@@ -69,26 +69,31 @@
 
 * **Action Value (True Value):**  The *true* value of an action *a*, denoted as $q_*(a)$, is the expected reward when action *a* is selected. It is defined as:
 
-    $$
-    q_*(a) \doteq \mathbb{E}[R_t \mid A_t = a]
-    $$
+$$  
+q_*(a) \doteq \mathbb{E}[R_t \mid A_t = a]  
+$$  
 
-    Where:
-    * $q_*(a)$ is the true value (expected reward) of action $a$.
-    * $\mathbb{E}[\cdot]$ denotes the expected value.
-    * $R_t$ is the reward received at time step $t$.
-    * $A_t$ is the action taken at time step $t$.
-    * The notation $\doteq$ means "defined as" or "approximately equal to" in this context of definition.
+ Where:
+ 
+ $q_*(a)$ is the true value (expected reward) of action $a$.
+ 
+ $\mathbb{E}[\cdot]$ denotes the expected value.
+ 
+ $R_t$ is the reward received at time step $t$.
+ 
+ $A_t$ is the action taken at time step $t$.
+ 
+ The notation $\doteq$ means "defined as" or "approximately equal to" in this context of definition.
 
 * **Estimated Action Value:** The *estimated* value of action *a* at time step *t* is denoted as $Q_t(a)$.  The goal of learning is to make $Q_t(a)$ as close as possible to the true value $q_*(a)$.
 
 * **Greedy Action Selection (Exploitation):** Choosing the action with the currently highest estimated value.  This rule is defined as:
 
-    $$
-    A_t \doteq \arg\max_a Q_t(a)
-    $$
+ $$
+ A_t \doteq \arg\max_a Q_t(a)
+ $$
 
-    * $\arg\max_a$ means selecting the action *a* that maximizes the expression $Q_t(a)$.
+ * $\arg\max_a$ means selecting the action *a* that maximizes the expression $Q_t(a)$.
 
 * **Exploration Benefits:** Choosing non-greedy actions (exploration) allows you to improve your estimates of the values of less-explored actions, which can lead to the discovery of better actions and greater cumulative reward in the long run.
 
@@ -105,12 +110,13 @@
 
 * **Sample-Average Method for Estimating Action Values:** A simple method to estimate the value of an action *a*. It averages the rewards received after taking action *a* in the past:
 
-    $$
-    Q_t(a) \doteq \frac{\text{sum of rewards when } a \text{ taken prior to } t}{\text{number of times } a \text{ taken prior to } t} = \frac{\sum_{i=1}^{t-1} R_i \cdot \mathbb{1}_{A_i=a}}{\sum_{i=1}^{t-1} \mathbb{1}_{A_i=a}}
-    $$
+$$
+Q_t(a) \doteq \frac{\text{sum of rewards when } a \text{ taken prior to } t}{\text{number of times } a \text{ taken prior to } t} = \frac{\sum_{i=1}^{t-1} R_i \cdot \mathbb{1}_{A_i=a}}{\sum_{i=1}^{t-1}\mathbb{1}_{A_i=a}}
+$$
 
-    Where:
-    * $\mathbb{1}_{A_i=a}$ is an indicator function that is 1 if action $A_i$ was equal to $a$, and 0 otherwise.
+Where:
+ 
+$\mathbb{1}_{A_i=a}$ is an indicator function that is 1 if action $A_i$ was equal to $a$, and 0 otherwise.
 
 * **Law of Large Numbers:** As the number of times action *a* is taken approaches infinity (denominator goes to infinity), the estimated value $Q_t(a)$ converges to the true value $q_*(a)$.
 
