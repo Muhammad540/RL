@@ -39,19 +39,15 @@ for eps in epsilons:
             # the reward is sampled from a normal distribution with the mean 
             # being the true action value and the variance being 1
             reward = np.random.normal(true_action_values[action],1)
+            total_reward[timestep] += reward
+            action_counts[action] += 1
             
             # so intuitively, we are closing the error gap between the estimated and true action values
             # by moving the estimated action value towards the reward
             # also we normalize the update by the number of times we've chosen the action
             # so the more we've chosen the action, the less we update the estimated action value (since we are more confident)
-            if action_counts[action] > 0:
-                estimated_action_values[action] += (reward - estimated_action_values[action])/action_counts[action]
-            else:
-                estimated_action_values[action] = reward
-            
-            total_reward[timestep] += reward
-            action_counts[action] += 1
-        
+            estimated_action_values[action] += (reward - estimated_action_values[action])/action_counts[action] # this is the sample average action value update rule
+
         # average reward and action counts for each episode
         average_rewards[eps] += total_reward/timesteps
         average_action_counts += action_counts/timesteps
