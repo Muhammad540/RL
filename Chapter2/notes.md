@@ -129,3 +129,111 @@ $\mathbb{1}_{A_i=a}$ is an indicator function that is 1 if action $A_i$ was equa
 * **Near-Greedy:** $\epsilon$-greedy is considered a "near-greedy" approach because it mostly acts greedily but occasionally explores.
 
 * **Benefit of $\epsilon$-Greedy (Convergence in the Limit):**  In the long run (as the number of steps increases), $\epsilon$-greedy ensures that every action will be sampled infinitely many times (if $\epsilon > 0$). This guarantees that all estimated action values $Q_t(a)$ will eventually converge to their respective true values $q_*(a)$. This convergence property is important for finding optimal policies in the long run.
+
+##### 10-armed Testbed
+
+* Multi-armed bandit problems are used to study the effects of exploration vs. exploitation. In this scenario, you have multiple actions, and each action initially has an unknown mean and standard deviation for its reward distribution. Your exploration strategy, such as the $\epsilon$-greedy approach, is crucial for learning the best actions.
+
+* The multi-armed bandit problem serves as a benchmark to measure the performance and behavior of different learning algorithms, particularly those dealing with exploration-exploitation trade-offs.
+
+* **Greedy methods perform worse in the long run** because they can get stuck exploiting suboptimal actions early on, without sufficiently exploring other potentially better options.
+
+* **$\epsilon$-greedy methods have a higher chance of finding optimal actions** because the exploration component allows them to discover actions that greedy methods might miss.
+
+* It is beneficial to **reduce $\epsilon$ over time**. This strategy starts with higher exploration initially to discover good actions and then gradually shifts towards exploitation as knowledge improves, leveraging the best of both exploration and exploitation phases.
+
+* The choice between $\epsilon$-greedy and purely greedy methods depends on the specific characteristics of the task:
+
+    1. **High Reward Variance:** If the reward variance is high (e.g., variance of 10), meaning rewards are noisy and fluctuate significantly, more exploration is needed to reliably estimate the true value of each action and find the optimal one.
+
+    2. **Low or Near-Zero Reward Variance:** If the reward variance is low or close to zero (rewards are consistent), a greedy method might quickly identify the true value of each action after trying it just a few times (or even once in a deterministic case).
+
+    3. **Non-Stationary Tasks:** If the task is non-stationary, meaning the true reward distribution of actions changes over time, exploration becomes essential even in deterministic or low-variance scenarios. Actions that were once suboptimal may become optimal, requiring continuous exploration to adapt to these changes.
+
+* **Most real-world Reinforcement Learning problems are non-stationary**, making exploration a critical component of effective learning agents.
+
+<br/>
+
+##### Incremental Implementation
+
+Let's recall our current goal: to **estimate the true action value for the available set of actions** efficiently.
+
+* **Incremental update formulas** for estimating action values are computationally efficient, requiring constant memory and constant computation per time step.  A basic incremental update formula is:
+
+    $$
+    Q_{n+1} = Q_n + \frac{1}{n}[R_n - Q_n]
+    $$
+
+    *  We can recognize a general pattern in this update rule:
+
+    $$
+    \text{NewEstimate} = \text{OldEstimate} + \text{StepSize} \times (\text{Target} - \text{OldEstimate})
+    $$
+
+    *  Here, the `Target` is the reward $R_n$. In general, the target represents a desired direction to move the estimate towards.
+
+<br/>
+
+##### Tracking a Non-Stationary Problem
+
+* As previously mentioned, **non-stationary problems** are characterized by changing reward probabilities over time.
+
+* In such dynamic environments, it is crucial to prioritize **recent rewards** over rewards received long ago when updating action value estimates, as older rewards may no longer be relevant to the current action values.
+
+* **Solution 1: Constant Step-Size Parameter**
+
+    * Use a constant step-size parameter, denoted as $\alpha$, to give more weight to recent rewards:
+
+        $$
+        Q_{n+1} \doteq Q_n + \alpha(R_n - Q_n)
+        $$
+
+        where $\alpha \in (0, 1]$ is a constant.
+
+    * Expanding this recursive formula, we can express $Q_{n+1}$ as a weighted average of past rewards:
+
+        $$
+        Q_{n+1} = (1-\alpha)^n Q_1 + \sum_{i=1}^n \alpha(1-\alpha)^{n-i} R_i
+        $$
+
+        where the sum of weights is equal to 1:
+
+        $$
+        (1-\alpha)^n + \sum_{i=1}^n \alpha(1-\alpha)^{n-i} = 1
+        $$
+
+    * The weight assigned to each reward $R_i$, which is $\alpha(1-\alpha)^{n-i}$, depends on how many rewards ago it was observed ($n-i$). Since $0 < (1-\alpha) < 1$, the weight given to $R_i$ **decreases exponentially** as the number of intervening rewards increases.
+
+    * If $i=1$, the reward $R_1$ was received $n-1$ steps ago, and its weight $\alpha(1-\alpha)^{n-1}$ will be relatively low (especially if $n$ is large). If $i=n$, the reward $R_n$ is the most recent reward, and its weight $\alpha(1-\alpha)^{0} = \alpha$ will be the highest among the rewards $R_1, ..., R_n$.
+
+    * **Exponential Recency Weighted Average:** This behavior of prioritizing recent rewards through exponentially decaying weights is known as the **exponential recency weighted average**.
+
+    * **Weight Decay Visualization:**
+
+        ![Exponential Weight Decay](expdecay.png)
+        *As illustrated in the figure, the weight decays exponentially as the rewards become older. If $\alpha$ is close to 1 (making $1-\alpha$ close to 0), almost all the weight is placed on the most recent reward.*
+
+* **Step-size parameter $\alpha$ (or $\alpha_n$):**  Determines how much emphasis to give to newly received rewards when updating the estimated value of an action after the $n^{th}$ selection.
+
+* **Sample Average Method Responsiveness:** As the number of observations increases in the sample average method, it becomes less responsive to new rewards due to the $1/n$ step size, which diminishes over time.
+
+    | Feature                      | Sample Average Method                       | Constant Step-Size Method                               |
+    | ---------------------------- | ------------------------------------------- | ------------------------------------------------------- |
+    | **Convergence**              | Converges to true value over time (stationary)           | May oscillate, bias can persist (non-stationary)                         |
+    | **Responsiveness**           | Slower response to recent data              | Quick adaptation to changes                             |
+    | **Bias Reduction**           | Reduces bias over time with sufficient data (stationary) | Bias may persist with poor initial estimates (non-stationary)            |
+    | **Stability**                | More stable; less volatile (stationary)                  | More volatile; can diverge (non-stationary)                              |
+    | **Computational Efficiency** | Simple and efficient to compute             | Also efficient, but requires careful tuning of $\alpha$ |
+    | **Use Case Suitability**     | Best for stationary problems                | Best for non-stationary problems                        |
+
+* **Tuning $\alpha$:** In the constant step-size method, if $\alpha$ is too large, the learner becomes overly sensitive to noise and short-term fluctuations. If $\alpha$ is too small, learning becomes slow, and the agent may not react quickly enough to changes in non-stationary environments.
+
+* **Impact of Initial Estimates:** The sample average method can mitigate the impact of poor initial estimates over many samples. In contrast, the constant step-size method's performance can be more influenced by initial values, as indicated by the $Q_1$ term in the expanded formula, although its influence diminishes over time, it is still present.
+
+* **True Action Value Reiteration:** To reiterate, **True action value** is the actual expected reward for an action in a given state.
+
+* **Key Difference:** In the sample average method, the focus gradually shifts away from initial values as more data is collected. In the constant step-size method, while the influence of $Q_1$ diminishes over time, it is still a component of the estimate, making the choice of initial value and the constant step-size parameter $\alpha$ more important, especially in non-stationary environments.
+
+* To observe the difference between sample average and constant step-size method, review the code in *algorithms/2_5.py* and see the **action_value_methods_performance** plot.
+
+
