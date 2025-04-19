@@ -234,6 +234,99 @@ Let's recall our current goal: to **estimate the true action value for the avail
 
 * **Key Difference:** In the sample average method, the focus gradually shifts away from initial values as more data is collected. In the constant step-size method, while the influence of $Q_1$ diminishes over time, it is still a component of the estimate, making the choice of initial value and the constant step-size parameter $\alpha$ more important, especially in non-stationary environments.
 
-* To observe the difference between sample average and constant step-size method, review the code in *algorithms/2_5.py* and see the **action_value_methods_performance** plot.
+* To observe the difference between sample average and constant step-size method, review the code in *nonStationaryCase.py* and see the **action_value_methods_performance_nonstationary** plot.
 
+##### Optimistic Initial Values
+*   Initial values provide a way to incorporate prior knowledge about the potential level of rewards.
+*   If you set the initial action-value estimates to be very high (optimistic), and the actual rewards are lower (e.g., drawn from a distribution with mean 0), the agent will receive negative reward prediction errors (`Reward - Estimate`).
+*   These negative errors cause the estimated values of the *chosen* actions to decrease.
+*   This makes other actions (which still retain their high initial estimates) comparatively more attractive. Even with a purely greedy action selection policy, the agent will be incentivized to explore these other actions to see if their initial high estimates are justified.
+*   Initially, this method might perform worse than standard approaches (as it explores sub-optimal actions due to inflated estimates), but it often performs better in the long run as the initial exploration helps discover better actions more reliably.
+*   This technique is generally most effective for stationary problems.
+*   **Important Note:** Any method that relies heavily on initial conditions or treats the beginning of time as special is typically less effective for general nonstationary problems.
+
+###### Unbiased Constant-Step-Size Trick
+
+*   **Sample averages**: Unbiased (the estimate is a true average) but perform poorly on nonstationary problems because they average over *all* past data, giving equal weight to old, potentially irrelevant information.
+*   **Constant step sizes**: Adapt well to nonstationary problems (by effectively using a recency-weighted average) but introduce a bias in their early estimates due to the influence of the initial value $Q_1$.
+
+The trick uses a modified, time-varying step size that aims to combine the benefits:
+
+```
+β_n = α/ō_n
+```
+
+Where:
+*   `α > 0` is a conventional, fixed constant step size parameter.
+*   `ō_n` is a weighted average or trace of past step sizes, starting at 0 and updated according to:
+    ```
+    ō_0 = 0
+    ō_n = ō_{n-1} + α(1 - ō_{n-1}) for n > 0
+    ```
+*   `ō_n` simplifies to `1 - (1-α)^n`. This value starts at `α` for n=1 and approaches 1 as n increases.
+*   The Q-value update for the action `A_n` taken at step `n` receiving reward `R_{n+1}` follows the standard form, but using `β_n` as the step size:
+    `Q_{n+1}(A_n) = Q_n(A_n) + β_n[R_{n+1} - Q_n(A_n)]`
+*   The influence of the initial $Q_1$ value diminishes to zero as `n` increases, effectively removing the initial bias in the long run.
+*   The weights assigned to past rewards transition from behaving like sample averages initially towards a recency-weighted average as `n` grows.
+
+**Benefits:**
+1.  **Reduced Initial Bias**: The influence of the arbitrary initial $Q_1$ value is eventually eliminated.
+2.  **Adaptability**: The step size `β_n` doesn't go to zero, allowing it to track changes in nonstationary environments.
+3.  **Simple Implementation**: Only requires tracking one additional variable (`ō_n`).
+
+##### Upper Confidence Bound (UCB) Action Selection
+
+*   Instead of exploring randomly (like ε-greedy), UCB intelligently balances exploration and exploitation by selecting actions based on an *upper confidence bound* on their potential value.
+*   It considers both:
+    1.  The current estimate of the action's value (`Q_t(a)`, favouring exploitation).
+    2.  An estimate of the uncertainty in that value estimate (`c * sqrt(ln t / N_t(a))`, favouring exploration, especially for actions not tried often).
+*   The action selected at time `t` is given by:
+    $$A_t \doteq \text{argmax}_{a} \left[ Q_t(a) + c\sqrt{\frac{\ln t}{N_t(a)}} \right] $$
+    *   $N_t(a)$ is the number of times action `a` has been selected prior to time `t`.
+    *   $c > 0$ is a parameter controlling the degree of exploration (higher `c` means more exploration).
+    *   The square root term is a measure of the *potential* for the action's true value to be higher, based on the uncertainty due to limited sampling.
+    *   Each time an action `a` is selected, `N_t(a)` increases, reducing the uncertainty term for that specific action.
+    *   Each time any action is selected, `t` increases. This increases the uncertainty term for *all* actions, but relatively more so for actions that haven't been selected recently (where `N_t(a)` remains low while `ln t` grows). This ensures all actions are eventually considered for exploration.
+    *   The `ln t` term ensures that the exploration bonus grows unboundedly over time, albeit at a decreasing rate, guaranteeing that every action is selected infinitely often as t goes to infinity.
+
+##### Gradient Bandit Algorithms
+
+*   Unlike value-based methods that estimate expected reward, gradient bandits learn a numerical *preference* for each action.
+*   These preferences `H_t(a)` are not estimates of reward but influence the *probability* of selecting an action.
+*   Preferences are relative: only the differences between preferences matter for action selection.
+*   Actions are selected according to a softmax distribution over the preferences:
+    $$
+    \Pr\{A_t=a\} \doteq \frac{e^{H_t(a)}}{\sum_{b=1}^k e^{H_t(b)}} \doteq \pi_t(a),
+    $$
+    where $\pi_t(a)$ is the probability of selecting action `a` at time `t`.
+*   Initially, preferences are typically set to zero for all actions (`H_t(a) = 0`), resulting in equal probability for all actions (`π_t(a) = 1/k`).
+*   After selecting action `A_t` at time `t` and receiving reward `R_t`, the action preferences are updated via a stochastic gradient ascent:
+    $$H_{t+1}(A_t) \doteq H_t(A_t) + \alpha(R_t - \bar{R}_t)(1 - \pi_t(A_t)), \quad \text{(for the chosen action)}$$
+    $$H_{t+1}(a) \doteq H_t(a) - \alpha(R_t - \bar{R}_t)\pi_t(a), \quad \text{(for all unchosen actions } a \neq A_t)$$
+    where:
+    *   `α > 0` is the step size.
+    *   `$\bar{R}_t$` is the average of all rewards received up to time `t-1`. This serves as a *baseline*.
+*   The baseline `$\bar{R}_t$` is crucial; the update is based on how the received reward `R_t` compares to this average.
+*   If `R_t` is higher than the baseline (`R_t - $\bar{R}_t$ > 0`), the preference `H_t(A_t)` for the chosen action `A_t` increases, making it more likely to be chosen in the future. Preferences for unchosen actions decrease.
+*   If `R_t` is lower than the baseline (`R_t - $\bar{R}_t$ < 0`), the preference `H_t(A_t)` for the chosen action `A_t` decreases, making it less likely in the future. Preferences for unchosen actions increase.
+*   The baseline helps reduce variance in the updates, leading to faster learning.
+
+**Associative Search (Contextual Bandits)**
+
+*   This combines trial-and-error learning (finding the best action) with association (learning which action is best in which *situation* or *context*).
+*   If the "situation" (or state) does not change based on the action taken, and the action only affects the immediate reward, this is a **Contextual Bandit** problem. The agent learns a policy mapping contexts to actions.
+*   If the action also affects the *next* situation (as well as the reward), this is a full **Reinforcement Learning** problem with sequential decision making and state transitions.
+
+All the algos that we have covered until now:
+    ![comparison](comparison.png)
+
+Summary of the exploration strategies and value estimation methods discussed for multi-armed bandits:
+
+*   **Value-Based Methods**: Estimate action values (`Q(a)`) and select actions based on these estimates.
+    *   **Estimation Methods**: Sample Average, Constant Step Size, Unbiased Constant Step Size.
+    *   **Exploration Strategies**: ε-Greedy, Optimistic Initial Values, Upper Confidence Bound (UCB).
+*   **Preference-Based Methods**: Learn action preferences (`H(a)`) and select actions stochastically based on these preferences (Softmax).
+    *   **Method**: Gradient Bandit Algorithms (using a baseline).
+
+These methods provide different ways to address the exploration-exploitation dilemma in stateless (or single-state) problems.
 
